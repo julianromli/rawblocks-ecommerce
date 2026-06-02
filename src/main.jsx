@@ -6,11 +6,32 @@ import '@fontsource/geist-mono/400.css'
 import './index.css'
 import App from './App.jsx'
 import { CartProvider } from './context/CartContext.jsx'
+import { AuthProvider } from './context/AuthContext.jsx'
+import { authClient } from './lib/neonClient.js'
+import { NeonAuthUIProvider } from '@neondatabase/auth-ui'
 import { Toaster } from 'sonner'
+
+const AppProviders = ({ children }) => {
+  const content = (
+    <AuthProvider>
+      <CartProvider>{children}</CartProvider>
+    </AuthProvider>
+  )
+
+  if (!authClient) {
+    return content
+  }
+
+  return (
+    <NeonAuthUIProvider authClient={authClient} redirectTo="/">
+      {content}
+    </NeonAuthUIProvider>
+  )
+}
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <CartProvider>
+    <AppProviders>
       <Toaster position="bottom-right" toastOptions={{
         style: {
           background: '#000',
@@ -21,6 +42,6 @@ createRoot(document.getElementById('root')).render(
         }
       }} />
       <App />
-    </CartProvider>
+    </AppProviders>
   </StrictMode>,
 )

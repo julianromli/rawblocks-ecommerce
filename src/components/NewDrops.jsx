@@ -1,74 +1,42 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { ArrowRight, ShoppingCart } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
+import { useAuth } from '../context/AuthContext';
+import { apiRequest } from '../lib/api';
 import { toast } from 'sonner';
 import ImageLoader from './ImageLoader';
 import FadeIn from './FadeIn';
 
-const products = [
-  {
-    id: 1,
-    name: 'SHADOW DRIP',
-    description: 'A sleek, minimalistic hoodie with dark tones and subtle reflective accents for an effortless street vibe.',
-    price: 89,
-    originalPrice: 120,
-    image: 'https://images.unsplash.com/photo-1556821840-3a63f95609a7?q=80&w=800&auto=format&fit=crop',
-    isNew: true,
-  },
-  {
-    id: 2,
-    name: 'URBAN PHANTOM',
-    description: 'Urban Phantom - A bold, oversized hoodie with edgy graphics and a stealthy aesthetic inspired by city nights.',
-    price: 89,
-    originalPrice: 120,
-    image: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?q=80&w=800&auto=format&fit=crop',
-    isNew: true,
-  },
-  {
-    id: 3,
-    name: 'NEON REBELLION',
-    description: 'A statement piece with vibrant neon details and rebellious street art influences for a standout look.',
-    price: 89,
-    originalPrice: 120,
-    image: 'https://images.unsplash.com/photo-1506629082955-511b1aa562c8?q=80&w=800&auto=format&fit=crop',
-    isNew: true,
-  },
-  {
-    id: 4,
-    name: 'MIDNIGHT RUNNER',
-    description: 'Lightweight and breathable jacket designed for late-night city runs and urban exploration.',
-    price: 95,
-    originalPrice: 130,
-    image: 'https://images.unsplash.com/photo-1578587018452-892bacefd3f2?q=80&w=800&auto=format&fit=crop',
-    isNew: true,
-  },
-  {
-    id: 5,
-    name: 'CONCRETE JUNGLE',
-    description: 'Heavyweight cotton tee featuring an abstract brutalist architectural print on the back.',
-    price: 45,
-    originalPrice: 65,
-    image: 'https://images.unsplash.com/photo-1583743814966-8936f5b7be1a?q=80&w=800&auto=format&fit=crop',
-    isNew: false,
-  },
-  {
-    id: 6,
-    name: 'GRAFFITI SOUL',
-    description: 'Classic fit hoodie with custom hand-drawn graffiti style lettering and premium embroidery.',
-    price: 110,
-    originalPrice: 150,
-    image: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?q=80&w=800&auto=format&fit=crop',
-    isNew: true,
-  }
-];
-
 const NewDrops = () => {
   const { addToCart } = useCart();
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const [products, setProducts] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  const handleAddToCart = (e, product) => {
+  useEffect(() => {
+    apiRequest('/api/products', { auth: false })
+      .then(({ products: nextProducts }) => setProducts(nextProducts))
+      .catch((nextError) => setError(nextError.message))
+      .finally(() => setIsLoading(false));
+  }, []);
+
+  const handleAddToCart = async (e, product) => {
     e.stopPropagation();
-    addToCart(product);
-    toast.success(`${product.name} added to cart!`);
+    if (!user) {
+      toast.message('Sign in to add items to your cart.');
+      navigate('/sign-in');
+      return;
+    }
+
+    try {
+      await addToCart(product);
+      toast.success(`${product.name} added to cart!`);
+    } catch (nextError) {
+      toast.error(nextError.message);
+    }
   };
 
   return (
@@ -86,6 +54,9 @@ const NewDrops = () => {
           </button>
         </div>
       </FadeIn>
+
+      {isLoading && <p className="font-mono text-sm text-gray-500">Loading products...</p>}
+      {error && <p className="font-mono text-sm text-red-500">{error}</p>}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
         {products.map((product, index) => (
@@ -116,8 +87,10 @@ const NewDrops = () => {
                 {product.description}
               </p>
               <div className="flex items-center gap-3">
-                <span className="text-lg font-bold">${product.price}</span>
-                <span className="text-gray-400 line-through text-sm">${product.originalPrice}</span>
+                <span className="text-lg font-bold">${product.price.toFixed(2)}</span>
+                {product.originalPrice && (
+                  <span className="text-gray-400 line-through text-sm">${product.originalPrice.toFixed(2)}</span>
+                )}
               </div>
             </div>
           </FadeIn>

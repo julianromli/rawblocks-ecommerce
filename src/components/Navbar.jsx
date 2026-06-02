@@ -4,6 +4,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { ShoppingCart, ChevronDown, X, ShoppingBag, Plus, Minus, Trash2, Menu } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useCart } from '../context/CartContext';
+import { useAuth } from '../context/AuthContext';
+import { toast } from 'sonner';
 
 const Instagram = ({ size = 24, className }) => (
   <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
@@ -40,6 +42,31 @@ const Navbar = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const { cartItems, removeFromCart, updateQuantity, cartTotal, itemCount } = useCart();
+  const { user, profile, isAdmin, signOut } = useAuth();
+
+  const handleCartAction = async (action) => {
+    try {
+      await action();
+    } catch (error) {
+      toast.error(error.message);
+    }
+  };
+
+  const openCart = () => {
+    if (!user) {
+      toast.message('Sign in to use your cart.');
+      navigate('/sign-in');
+      return;
+    }
+
+    setIsCartOpen(true);
+  };
+
+  const handleSignOut = async () => {
+    await signOut();
+    setIsCartOpen(false);
+    navigate('/');
+  };
 
   useEffect(() => {
     const handleScroll = () => {
@@ -109,11 +136,22 @@ const Navbar = () => {
           <a href="#" className="hover:text-gray-600 transition-colors">Women</a>
           <a href="#" className="hover:text-gray-600 transition-colors">Our Story</a>
           <a href="#" className="hover:text-gray-600 transition-colors">Contact</a>
+          {user && <Link to="/orders" className="hover:text-gray-600 transition-colors">Orders</Link>}
+          {isAdmin && <Link to="/admin/products" className="hover:text-gray-600 transition-colors">Admin</Link>}
         </nav>
 
         <div className="flex items-center gap-4">
+          {user ? (
+            <button onClick={handleSignOut} className="hidden md:inline-flex text-xs font-bold uppercase tracking-wide hover:text-gray-600">
+              Sign out
+            </button>
+          ) : (
+            <Link to="/sign-in" className="hidden md:inline-flex text-xs font-bold uppercase tracking-wide hover:text-gray-600">
+              Sign in
+            </Link>
+          )}
           <button 
-            onClick={() => setIsCartOpen(true)}
+            onClick={openCart}
             className="p-2 hover:bg-gray-100 rounded-full transition-colors relative"
           >
             <ShoppingCart size={20} />
@@ -174,6 +212,13 @@ const Navbar = () => {
                   <a href="#" className="hover:text-gray-600 transition-colors">Women</a>
                   <a href="#" className="hover:text-gray-600 transition-colors">Our Story</a>
                   <a href="#" className="hover:text-gray-600 transition-colors">Contact</a>
+                  {user && <Link to="/orders" onClick={() => setIsMobileMenuOpen(false)} className="hover:text-gray-600 transition-colors">Orders</Link>}
+                  {isAdmin && <Link to="/admin/products" onClick={() => setIsMobileMenuOpen(false)} className="hover:text-gray-600 transition-colors">Admin</Link>}
+                  {user ? (
+                    <button onClick={handleSignOut} className="text-left hover:text-gray-600 transition-colors uppercase">Sign out</button>
+                  ) : (
+                    <Link to="/sign-in" onClick={() => setIsMobileMenuOpen(false)} className="hover:text-gray-600 transition-colors">Sign in</Link>
+                  )}
                 </div>
               </motion.div>
             </>
@@ -206,7 +251,10 @@ const Navbar = () => {
               >
                 {/* Header */}
                 <div className="flex items-center justify-between p-6 border-b border-gray-100">
-                  <h2 className="text-xl font-bold uppercase tracking-tight">Your Cart {itemCount > 0 && `(${itemCount})`}</h2>
+                  <div>
+                    <h2 className="text-xl font-bold uppercase tracking-tight">Your Cart {itemCount > 0 && `(${itemCount})`}</h2>
+                    {profile?.email && <p className="font-mono text-xs text-gray-500 mt-1">{profile.email}</p>}
+                  </div>
                   <button 
                     onClick={() => setIsCartOpen(false)}
                     className="p-2 hover:bg-gray-100 rounded-full transition-colors"
@@ -246,7 +294,7 @@ const Navbar = () => {
                                 <div className="flex justify-between items-start mb-1">
                                   <h3 className="font-bold uppercase text-sm">{item.name}</h3>
                                   <button 
-                                    onClick={() => removeFromCart(item.id)}
+                                    onClick={() => handleCartAction(() => removeFromCart(item.id))}
                                     className="text-gray-400 hover:text-red-500 transition-colors"
                                   >
                                     <Trash2 size={16} />
@@ -258,14 +306,14 @@ const Navbar = () => {
                               <div className="flex justify-between items-end">
                                 <div className="flex items-center border border-gray-200 rounded-full">
                                   <button 
-                                    onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                                    onClick={() => handleCartAction(() => updateQuantity(item.id, item.quantity - 1))}
                                     className="p-2 hover:bg-gray-50 rounded-l-full transition-colors"
                                   >
                                     <Minus size={14} />
                                   </button>
                                   <span className="font-mono text-sm w-8 text-center">{item.quantity}</span>
                                   <button 
-                                    onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                                    onClick={() => handleCartAction(() => updateQuantity(item.id, item.quantity + 1))}
                                     className="p-2 hover:bg-gray-50 rounded-r-full transition-colors"
                                   >
                                     <Plus size={14} />

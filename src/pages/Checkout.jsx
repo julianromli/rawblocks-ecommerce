@@ -1,13 +1,57 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useCart } from '../context/CartContext';
-import { Link } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, ShieldCheck } from 'lucide-react';
+import { toast } from 'sonner';
 import FadeIn from '../components/FadeIn';
+import { apiRequest } from '../lib/api';
 
 const Checkout = () => {
-  const { cartItems, cartTotal } = useCart();
+  const navigate = useNavigate();
+  const { profile } = useAuth();
+  const { cartItems, cartTotal, clearCart } = useCart();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [form, setForm] = useState({
+    email: profile?.email || '',
+    newsletter: false,
+    firstName: '',
+    lastName: '',
+    address: '',
+    city: '',
+    postalCode: '',
+  });
   const shipping = cartTotal > 0 ? 15 : 0;
   const total = cartTotal + shipping;
+
+  useEffect(() => {
+    if (profile?.email) {
+      setForm((current) => ({ ...current, email: current.email || profile.email }));
+    }
+  }, [profile?.email]);
+
+  const updateField = (field, value) => {
+    setForm((current) => ({ ...current, [field]: value }));
+  };
+
+  const submitOrder = async (event) => {
+    event.preventDefault();
+    setIsSubmitting(true);
+
+    try {
+      const { order } = await apiRequest('/api/orders', {
+        method: 'POST',
+        body: form,
+      });
+      clearCart();
+      toast.success(`Order #${order.id.slice(0, 8)} created`);
+      navigate('/orders');
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   if (cartItems.length === 0) {
     return (
@@ -36,7 +80,7 @@ const Checkout = () => {
           <FadeIn direction="up">
             <h1 className="text-3xl font-bold uppercase tracking-tight mb-8">Checkout</h1>
             
-            <form className="space-y-8">
+            <form onSubmit={submitOrder} className="space-y-8">
               {/* Contact Info */}
               <section>
                 <h2 className="text-xl font-bold uppercase mb-4">Contact Information</h2>
@@ -44,10 +88,12 @@ const Checkout = () => {
                   <input 
                     type="email" 
                     placeholder="Email address" 
+                    value={form.email}
+                    onChange={(event) => updateField('email', event.target.value)}
                     className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all"
                   />
                   <div className="flex items-center gap-2">
-                    <input type="checkbox" id="newsletter" className="rounded text-black focus:ring-black accent-black" />
+                    <input type="checkbox" id="newsletter" checked={form.newsletter} onChange={(event) => updateField('newsletter', event.target.checked)} className="rounded text-black focus:ring-black accent-black" />
                     <label htmlFor="newsletter" className="text-sm text-gray-600">Email me with news and offers</label>
                   </div>
                 </div>
@@ -60,26 +106,36 @@ const Checkout = () => {
                   <input 
                     type="text" 
                     placeholder="First name" 
+                    value={form.firstName}
+                    onChange={(event) => updateField('firstName', event.target.value)}
                     className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all"
                   />
                   <input 
                     type="text" 
                     placeholder="Last name" 
+                    value={form.lastName}
+                    onChange={(event) => updateField('lastName', event.target.value)}
                     className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all"
                   />
                   <input 
                     type="text" 
                     placeholder="Address" 
+                    value={form.address}
+                    onChange={(event) => updateField('address', event.target.value)}
                     className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all md:col-span-2"
                   />
                   <input 
                     type="text" 
                     placeholder="City" 
+                    value={form.city}
+                    onChange={(event) => updateField('city', event.target.value)}
                     className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all"
                   />
                   <input 
                     type="text" 
                     placeholder="Postal code" 
+                    value={form.postalCode}
+                    onChange={(event) => updateField('postalCode', event.target.value)}
                     className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all"
                   />
                 </div>
@@ -89,39 +145,21 @@ const Checkout = () => {
               <section>
                 <h2 className="text-xl font-bold uppercase mb-4">Payment</h2>
                 <p className="text-sm text-gray-500 mb-4 flex items-center gap-2">
-                  <ShieldCheck size={16} /> All transactions are secure and encrypted.
+                  <ShieldCheck size={16} /> Payment processing is not enabled yet.
                 </p>
                 <div className="space-y-4 bg-gray-50 p-6 rounded-2xl border border-gray-200">
-                  <input 
-                    type="text" 
-                    placeholder="Card number" 
-                    className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all"
-                  />
-                  <div className="grid grid-cols-2 gap-4">
-                    <input 
-                      type="text" 
-                      placeholder="Expiration date (MM/YY)" 
-                      className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all"
-                    />
-                    <input 
-                      type="text" 
-                      placeholder="Security code" 
-                      className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all"
-                    />
-                  </div>
-                  <input 
-                    type="text" 
-                    placeholder="Name on card" 
-                    className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all"
-                  />
+                  <p className="font-mono text-sm text-gray-500">
+                    This checkout creates a pending Neon order. Add Stripe or another processor before collecting payment details.
+                  </p>
                 </div>
               </section>
 
               <button 
-                type="button"
-                className="w-full bg-black text-white py-4 rounded-full font-bold uppercase tracking-wide hover:bg-gray-800 transition-colors text-lg mt-4"
+                type="submit"
+                disabled={isSubmitting}
+                className="w-full bg-black text-white py-4 rounded-full font-bold uppercase tracking-wide hover:bg-gray-800 transition-colors text-lg mt-4 disabled:opacity-60"
               >
-                Pay ${total.toFixed(2)}
+                {isSubmitting ? 'Placing order...' : `Place order $${total.toFixed(2)}`}
               </button>
             </form>
           </FadeIn>
