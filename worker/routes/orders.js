@@ -1,10 +1,11 @@
-import { requireUser, handleApiError } from '../_lib/auth.js';
-import { sql } from '../_lib/db.js';
-import { assertMethod, readJson, sendJson } from '../_lib/http.js';
+import { Hono } from 'hono';
+import { requireUser } from '../lib/auth.js';
+import { getSql } from '../lib/db.js';
+import { badRequest, toErrorResponse } from '../lib/errors.js';
 
 const SHIPPING_CENTS = 1500;
 
-const readOrders = async (userId) => {
+const readOrders = async (sql, userId) => {
   const orders = await sql`
     select *
     from orders
@@ -61,26 +62,30 @@ const validateShipping = (body, fallbackEmail) => {
   );
 
   if (missing.length > 0) {
-    const error = new Error(`Missing checkout fields: ${missing.join(', ')}`);
-    error.status = 400;
-    throw error;
+    throw badRequest(`Missing checkout fields: ${missing.join(', ')}`);
   }
 
   return shippingDetails;
 };
 
-export default async function handler(req, res) {
-  if (!assertMethod(req, res, ['GET', 'POST'])) return;
+const orders = new Hono();
 
+orders.get('/', async (c) => {
   try {
-    const { user } = await requireUser(req);
+    const { user } = await requireUser(c);
+    const sql = getSql(c.env);
+    return c.json({ orders: await readOrders(sql, user.id) });
+  } catch (error) {
+    return toErrorResponse(c, error);
+  }
+});
 
-    if (req.method === 'GET') {
-      sendJson(res, 200, { orders: await readOrders(user.id) });
-      return;
-    }
+orders.post('/', async (c) => {
+  try {
+    const { user } = await requireUser(c);
+    const sql = getSql(c.env);
+    const shippingDetails = validateShipping(await c.req.json(), user.email);
 
-    const shippingDetails = validateShipping(await readJson(req), user.email);
     const [order] = await sql`
       with cart_snapshot as (
         select ci.product_id, ci.quantity, p.name, p.price_cents
@@ -123,19 +128,23 @@ export default async function handler(req, res) {
     `;
 
     if (!order) {
-      sendJson(res, 400, { error: 'Cart is empty' });
-      return;
+      throw badRequest('Cart is empty');
     }
 
-    sendJson(res, 201, {
-      order: {
-        id: order.id,
-        status: order.status,
-        total: order.total_cents / 100,
-        createdAt: order.created_at,
+    return c.json(
+      {
+        order: {
+          id: order.id,
+          status: order.status,
+          total: order.total_cents / 100,
+          createdAt: order.created_at,
+        },
       },
-    });
+      201,
+    );
   } catch (error) {
-    handleApiError(res, error);
+    return toErrorResponse(c, error);
   }
-}
+});
+
+export default orders;

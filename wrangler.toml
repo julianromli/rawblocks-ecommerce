@@ -1,0 +1,17 @@
+"$schema" = "./node_modules/wrangler/config-schema.json"
+name = "rawblocks"
+main = "./worker/index.js"
+compatibility_date = "2026-06-12"
+compatibility_flags = ["nodejs_compat"]
+
+[assets]
+# All non-/api, non-asset requests serve index.html so the React SPA router works.
+not_found_handling = "single-page-application"
+# Ensure /api/* always hits the Worker instead of being swallowed by the SPA fallback.
+run_worker_first = ["/api/*"]
+
+# Non-secret vars can go here. Secrets (DATABASE_URL, NEON_AUTH_*) come from
+# `.dev.vars` in dev and `wrangler secret put` in production.
+[vars]
+NEON_AUTH_ISSUER = ""
+NEON_AUTH_AUDIENCE = ""
