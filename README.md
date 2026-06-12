@@ -1,16 +1,133 @@
-# React + Vite
+# RawBlocks
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A streetwear e-commerce app built with React + Vite on the frontend and a [Hono](https://hono.dev) API running on [Cloudflare Workers](https://workers.cloudflare.com). Data and auth are powered by [Neon](https://neon.tech) (Postgres + Neon Auth).
 
-Currently, two official plugins are available:
+Live: https://rawblocks.faizintifada.workers.dev/
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Tech Stack
 
-## React Compiler
+- **Frontend:** React 19, React Router, Tailwind CSS v4, Framer Motion
+- **API:** Hono on Cloudflare Workers (`worker/`)
+- **Database:** Neon (serverless Postgres) via `@neondatabase/serverless`
+- **Auth:** Neon Auth (JWT verified with `jose` against a JWKS endpoint)
+- **Tooling:** Vite 8 + `@cloudflare/vite-plugin`, Wrangler
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Architecture
 
-## Expanding the ESLint configuration
+This is a single fullstack Cloudflare Worker:
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+- `worker/index.js` mounts the Hono app and routes all `/api/*` requests.
+- Static assets (the built React SPA) are served by Cloudflare Assets. Unmatched non-API routes fall back to `index.html` so the client-side router works.
+- `run_worker_first = ["/api/*"]` in `wrangler.toml` ensures API requests always hit the Worker and are never swallowed by the SPA fallback.
+
+```
+worker/
+  index.js          # Hono app, mounts /api routes
+  lib/
+    db.js           # Neon client (per-request, from env) + row mappers
+    auth.js         # JWT verification + profile/role resolution
+    errors.js       # ApiError + JSON error responses
+  routes/
+    products.js     # GET/POST /api/products, PATCH/DELETE /api/products/:id
+    cart.js         # GET/PUT/PATCH/DELETE /api/cart
+    orders.js       # GET/POST /api/orders
+    me.js           # GET /api/me
+```
+
+## API Endpoints
+
+| Method | Path | Auth | Description |
+| --- | --- | --- | --- |
+| `GET` | `/api/products` | none | List active products (`?includeInactive=true` requires admin) |
+| `POST` | `/api/products` | admin | Create a product |
+| `PATCH` | `/api/products/:id` | admin | Update a product |
+| `DELETE` | `/api/products/:id` | admin | Delete a product |
+| `GET` | `/api/me` | user | Current user + role |
+| `GET` | `/api/cart` | user | Get cart items |
+| `PUT` | `/api/cart` | user | Set item quantity |
+| `PATCH` | `/api/cart` | user | Adjust item quantity by delta |
+| `DELETE` | `/api/cart` | user | Remove an item (`?productId=`) or clear cart |
+| `GET` | `/api/orders` | user | List orders |
+| `POST` | `/api/orders` | user | Create an order from the cart |
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js 18+
+- A [Neon](https://neon.tech) project with Neon Auth enabled
+
+### 1. Install dependencies
+
+```bash
+npm install
+```
+
+### 2. Configure environment
+
+Two sets of variables are used:
+
+- **Client (`VITE_*`)** — live in `.env`, exposed to the browser by Vite.
+- **Server secrets** — live in `.dev.vars` for local dev (read by the Worker), and are set as Wrangler secrets in production.
+
+Copy the example and fill in your values:
+
+```bash
+cp .env.example .env
+```
+
+Then create a `.dev.vars` file with the server-side secrets used by the Worker:
+
+```
+DATABASE_URL="postgresql://...@...neon.tech/neondb?sslmode=require"
+NEON_AUTH_JWKS_URL="https://<your-neon-auth-domain>/.well-known/jwks.json"
+ADMIN_EMAIL="you@example.com"
+NEON_AUTH_ISSUER=""
+NEON_AUTH_AUDIENCE=""
+```
+
+> `.env` and `.dev.vars` are gitignored. Never commit secrets.
+
+### 3. Apply the database schema
+
+Run the migration in `migrations/001_initial_neon.sql` against your Neon database (e.g. via the Neon SQL editor or `psql`).
+
+### 4. Run locally
+
+```bash
+npm run dev
+```
+
+The Cloudflare Vite plugin runs the Worker (API) and the React app together on a single dev server, so `/api/*` behaves exactly as it does in production.
+
+## Scripts
+
+| Script | Description |
+| --- | --- |
+| `npm run dev` | Start the dev server (frontend + Worker API) |
+| `npm run build` | Build the client and Worker bundles |
+| `npm run preview` | Preview the production build locally |
+| `npm run deploy` | Build and deploy to Cloudflare Workers |
+| `npm run lint` | Run ESLint |
+
+## Deployment
+
+Deploys to Cloudflare Workers via Wrangler. Configuration lives in `wrangler.toml`.
+
+### Set production secrets (once)
+
+Secrets are not read from `.dev.vars` in production — set them explicitly:
+
+```bash
+wrangler secret put DATABASE_URL
+wrangler secret put NEON_AUTH_JWKS_URL
+wrangler secret put ADMIN_EMAIL
+```
+
+(Set `NEON_AUTH_ISSUER` / `NEON_AUTH_AUDIENCE` too if your Neon Auth setup uses them.)
+
+### Deploy
+
+```bash
+npm run deploy
+```
