@@ -3,7 +3,8 @@ import { requireUser } from '../lib/auth.js';
 import { getSql } from '../lib/db.js';
 import { badRequest, toErrorResponse } from '../lib/errors.js';
 
-const SHIPPING_CENTS = 1500;
+// Flat shipping fee in whole IDR rupiah.
+const SHIPPING_CENTS = 262500;
 
 const readOrders = async (sql, userId) => {
   const orders = await sql`
@@ -29,9 +30,9 @@ const readOrders = async (sql, userId) => {
     id: order.id,
     status: order.status,
     email: order.email,
-    subtotal: order.subtotal_cents / 100,
-    shipping: order.shipping_cents / 100,
-    total: order.total_cents / 100,
+    subtotal: order.subtotal_cents,
+    shipping: order.shipping_cents,
+    total: order.total_cents,
     shippingDetails: order.shipping_details,
     createdAt: order.created_at,
     items: items
@@ -40,7 +41,7 @@ const readOrders = async (sql, userId) => {
         id: item.id,
         productId: item.product_id,
         name: item.product_name,
-        price: item.price_cents / 100,
+        price: item.price_cents,
         quantity: item.quantity,
       })),
   }));
@@ -136,7 +137,7 @@ orders.post('/', async (c) => {
         order: {
           id: order.id,
           status: order.status,
-          total: order.total_cents / 100,
+          total: order.total_cents,
           createdAt: order.created_at,
         },
       },

@@ -5,6 +5,7 @@ import { ShoppingCart, ChevronDown, X, ShoppingBag, Plus, Minus, Trash2, Menu } 
 import { motion, AnimatePresence } from 'framer-motion';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
+import { formatIDR } from '../lib/currency';
 import { toast } from 'sonner';
 
 const Instagram = ({ size = 24, className }) => (
@@ -300,7 +301,7 @@ const Navbar = () => {
                                     <Trash2 size={16} />
                                   </button>
                                 </div>
-                                <p className="font-mono text-gray-500 text-xs">${item.price}</p>
+                                <p className="font-mono text-gray-500 text-xs">{formatIDR(item.price)}</p>
                               </div>
                               
                               <div className="flex justify-between items-end">
@@ -319,7 +320,7 @@ const Navbar = () => {
                                     <Plus size={14} />
                                   </button>
                                 </div>
-                                <p className="font-bold">${item.price * item.quantity}</p>
+                                <p className="font-bold">{formatIDR(item.price * item.quantity)}</p>
                               </div>
                             </div>
                           </div>
@@ -331,7 +332,7 @@ const Navbar = () => {
                     <div className="p-6 border-t border-gray-100 bg-gray-50">
                       <div className="flex justify-between items-center mb-6">
                         <span className="font-mono text-sm text-gray-500 uppercase">Subtotal</span>
-                        <span className="text-2xl font-bold">${cartTotal}</span>
+                        <span className="text-2xl font-bold">{formatIDR(cartTotal)}</span>
                       </div>
                     <button 
                       onClick={() => {

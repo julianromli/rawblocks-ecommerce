@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, PackageCheck } from 'lucide-react';
 import { apiRequest } from '../lib/api';
+import { formatIDR } from '../lib/currency';
 
 const Orders = () => {
   const [orders, setOrders] = useState([]);
@@ -45,7 +46,7 @@ const Orders = () => {
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 border-b border-gray-100 pb-4 mb-4">
               <div>
                 <p className="font-mono text-xs text-gray-500 uppercase">Order #{order.id.slice(0, 8)}</p>
-                <h2 className="text-xl font-bold uppercase mt-1">${order.total.toFixed(2)}</h2>
+                <h2 className="text-xl font-bold uppercase mt-1">{formatIDR(order.total)}</h2>
               </div>
               <div className="text-left md:text-right">
                 <span className="inline-flex rounded-full bg-black px-3 py-1 text-xs font-bold uppercase text-white">
@@ -59,7 +60,7 @@ const Orders = () => {
               {order.items.map((item) => (
                 <div key={item.id} className="flex justify-between gap-4 font-mono text-sm">
                   <span>{item.name} x {item.quantity}</span>
-                  <span>${(item.price * item.quantity).toFixed(2)}</span>
+                  <span>{formatIDR(item.price * item.quantity)}</span>
                 </div>
               ))}
             </div>

@@ -6,6 +6,7 @@ import { ArrowLeft, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import FadeIn from '../components/FadeIn';
 import { apiRequest } from '../lib/api';
+import { formatIDR } from '../lib/currency';
 
 const Checkout = () => {
   const navigate = useNavigate();
@@ -21,7 +22,7 @@ const Checkout = () => {
     city: '',
     postalCode: '',
   });
-  const shipping = cartTotal > 0 ? 15 : 0;
+  const shipping = cartTotal > 0 ? 262500 : 0;
   const total = cartTotal + shipping;
 
   useEffect(() => {
@@ -159,7 +160,7 @@ const Checkout = () => {
                 disabled={isSubmitting}
                 className="w-full bg-black text-white py-4 rounded-full font-bold uppercase tracking-wide hover:bg-gray-800 transition-colors text-lg mt-4 disabled:opacity-60"
               >
-                {isSubmitting ? 'Placing order...' : `Place order $${total.toFixed(2)}`}
+                {isSubmitting ? 'Placing order...' : `Place order ${formatIDR(total)}`}
               </button>
             </form>
           </FadeIn>
@@ -184,7 +185,7 @@ const Checkout = () => {
                       <h3 className="font-bold uppercase text-sm">{item.name}</h3>
                       <p className="font-mono text-gray-500 text-xs">Qty: {item.quantity}</p>
                     </div>
-                    <p className="font-bold">${(item.price * item.quantity).toFixed(2)}</p>
+                    <p className="font-bold">{formatIDR(item.price * item.quantity)}</p>
                   </div>
                 ))}
               </div>
@@ -192,15 +193,15 @@ const Checkout = () => {
               <div className="space-y-3 pt-6 border-t border-gray-200 font-mono text-sm">
                 <div className="flex justify-between">
                   <span className="text-gray-500">Subtotal</span>
-                  <span className="font-bold text-black">${cartTotal.toFixed(2)}</span>
+                  <span className="font-bold text-black">{formatIDR(cartTotal)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-500">Shipping</span>
-                  <span className="font-bold text-black">${shipping.toFixed(2)}</span>
+                  <span className="font-bold text-black">{formatIDR(shipping)}</span>
                 </div>
                 <div className="flex justify-between pt-4 border-t border-gray-200 text-lg">
                   <span className="font-sans font-bold uppercase">Total</span>
-                  <span className="font-sans font-bold">${total.toFixed(2)}</span>
+                  <span className="font-sans font-bold">{formatIDR(total)}</span>
                 </div>
               </div>
             </div>

@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { apiRequest } from '../lib/api';
+import { formatIDR } from '../lib/currency';
 import { toast } from 'sonner';
 import ImageLoader from './ImageLoader';
 import FadeIn from './FadeIn';
@@ -87,9 +88,9 @@ const NewDrops = () => {
                 {product.description}
               </p>
               <div className="flex items-center gap-3">
-                <span className="text-lg font-bold">${product.price.toFixed(2)}</span>
+                <span className="text-lg font-bold">{formatIDR(product.price)}</span>
                 {product.originalPrice && (
-                  <span className="text-gray-400 line-through text-sm">${product.originalPrice.toFixed(2)}</span>
+                  <span className="text-gray-400 line-through text-sm">{formatIDR(product.originalPrice)}</span>
                 )}
               </div>
             </div>
