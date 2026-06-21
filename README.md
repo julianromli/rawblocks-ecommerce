@@ -2,7 +2,7 @@
 
 A streetwear e-commerce app built with React + Vite on the frontend and a [Hono](https://hono.dev) API running on [Cloudflare Workers](https://workers.cloudflare.com). Data and auth are powered by [Neon](https://neon.tech) (Postgres + Neon Auth).
 
-Live: https://rawblocks.faizintifada.workers.dev/
+Live: https://rawblocks.faizintifada.com
 
 ## Tech Stack
 
