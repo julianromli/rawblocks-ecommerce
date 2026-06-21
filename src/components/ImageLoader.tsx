@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-const ImageLoader = ({ src, alt, className }) => {
+const ImageLoader = ({ src, alt, className }: { src: string; alt: string; className?: string }) => {
   const [isLoaded, setIsLoaded] = useState(false);
 
   return (

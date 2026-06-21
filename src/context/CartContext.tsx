@@ -1,15 +1,34 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { useAuth } from './AuthContext';
 import { apiRequest } from '../lib/api';
+import { CartItem, Product } from '../types';
 
-const CartContext = createContext();
+export interface CartContextType {
+  cartItems: CartItem[];
+  addToCart: (product: Product) => Promise<void>;
+  removeFromCart: (productId: string) => Promise<void>;
+  updateQuantity: (productId: string, quantity: number) => Promise<void>;
+  clearCart: () => void;
+  loadCart: () => Promise<CartItem[]>;
+  cartTotal: number;
+  itemCount: number;
+  isCartLoading: boolean;
+}
 
-export const useCart = () => useContext(CartContext);
+const CartContext = createContext<CartContextType | null>(null);
 
-export const CartProvider = ({ children }) => {
+export const useCart = () => {
+  const context = useContext(CartContext);
+  if (!context) {
+    throw new Error('useCart must be used within CartProvider');
+  }
+  return context;
+};
+
+export const CartProvider = ({ children }: { children: React.ReactNode }) => {
   const { user, getAccessToken } = useAuth();
   const userId = user?.id || user?.sub || null;
-  const [cartItems, setCartItems] = useState([]);
+  const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [isCartLoading, setIsCartLoading] = useState(false);
 
   const loadCart = useCallback(async () => {
@@ -38,7 +57,7 @@ export const CartProvider = ({ children }) => {
     loadCart().catch(() => setCartItems([]));
   }, [loadCart]);
 
-  const addToCart = async (product) => {
+  const addToCart = async (product: Product) => {
     if (!userId) {
       throw new Error('Please sign in before adding items to your cart.');
     }
@@ -68,7 +87,7 @@ export const CartProvider = ({ children }) => {
     }
   };
 
-  const removeFromCart = async (productId) => {
+  const removeFromCart = async (productId: string) => {
     const previous = cartItems;
     setCartItems(prev => prev.filter(item => item.id !== productId));
 
@@ -83,7 +102,7 @@ export const CartProvider = ({ children }) => {
     }
   };
 
-  const updateQuantity = async (productId, quantity) => {
+  const updateQuantity = async (productId: string, quantity: number) => {
     const currentItem = cartItems.find((item) => item.id === productId);
 
     if (quantity <= 0) {

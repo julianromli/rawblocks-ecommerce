@@ -3,7 +3,9 @@ import { requireUser } from '../lib/auth.js';
 import { getSql, mapCartItem } from '../lib/db.js';
 import { badRequest, notFound, toErrorResponse } from '../lib/errors.js';
 
-const parsePositiveInteger = (value, fallback = 1) => {
+import { AppEnv } from '../types.js';
+
+const parsePositiveInteger = (value: any, fallback = 1) => {
   const parsed = Number(value);
   if (!Number.isInteger(parsed) || parsed < 1) {
     return fallback;
@@ -11,7 +13,7 @@ const parsePositiveInteger = (value, fallback = 1) => {
   return parsed;
 };
 
-const readCart = async (sql, userId) => {
+const readCart = async (sql: any, userId: string) => {
   const items = await sql`
     select
       p.id,
@@ -33,11 +35,11 @@ const readCart = async (sql, userId) => {
   return items.map(mapCartItem);
 };
 
-const ensureCart = async (sql, userId) => {
+const ensureCart = async (sql: any, userId: string) => {
   await sql`insert into carts (user_id) values (${userId}) on conflict (user_id) do nothing`;
 };
 
-const cart = new Hono();
+const cart = new Hono<AppEnv>();
 
 cart.get('/', async (c) => {
   try {

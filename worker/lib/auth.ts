@@ -1,12 +1,14 @@
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 import { getSql } from './db.js';
 import { ApiError, forbidden, unauthorized } from './errors.js';
+import { Bindings } from '../types.js';
+import type { Context } from 'hono';
 
 // JWKS sets are keyed by URL and cached across requests within an isolate.
 // The remote set itself handles key rotation/caching internally.
-const jwksCache = new Map();
+const jwksCache = new Map<string, ReturnType<typeof createRemoteJWKSet>>();
 
-const getJwks = (env) => {
+const getJwks = (env: any) => {
   const jwksUrl = env.NEON_AUTH_JWKS_URL;
   if (!jwksUrl) {
     throw new Error('NEON_AUTH_JWKS_URL is required to verify Neon Auth tokens.');
@@ -20,13 +22,13 @@ const getJwks = (env) => {
   return jwks;
 };
 
-const extractBearerToken = (req) => {
+const extractBearerToken = (req: any) => {
   const header = req.header('authorization') || '';
   const [scheme, token] = header.split(' ');
   return scheme?.toLowerCase() === 'bearer' ? token : null;
 };
 
-const readUserFromPayload = (payload) => {
+const readUserFromPayload = (payload: any) => {
   const id = payload.sub;
   const email = payload.email || payload.user_email || payload.preferred_username;
 
@@ -37,13 +39,13 @@ const readUserFromPayload = (payload) => {
   return { id, email: String(email).toLowerCase() };
 };
 
-export const getUserFromRequest = async (c) => {
+export const getUserFromRequest = async (c: Context) => {
   const token = extractBearerToken(c.req);
   if (!token) {
     throw unauthorized();
   }
 
-  const env = c.env;
+  const env = c.env as Bindings;
   const { payload } = await jwtVerify(token, getJwks(env), {
     issuer: env.NEON_AUTH_ISSUER || undefined,
     audience: env.NEON_AUTH_AUDIENCE || undefined,
@@ -52,9 +54,9 @@ export const getUserFromRequest = async (c) => {
   return readUserFromPayload(payload);
 };
 
-export const ensureProfile = async (c, user) => {
-  const sql = getSql(c.env);
-  const adminEmail = c.env.ADMIN_EMAIL?.toLowerCase();
+export const ensureProfile = async (c: Context, user: { id: string; email: string }) => {
+  const sql = getSql(c.env as Bindings);
+  const adminEmail = (c.env as any).ADMIN_EMAIL?.toLowerCase();
   const role = adminEmail && user.email === adminEmail ? 'admin' : 'customer';
 
   const [profile] = await sql`
@@ -74,13 +76,13 @@ export const ensureProfile = async (c, user) => {
   return profile;
 };
 
-export const requireUser = async (c) => {
+export const requireUser = async (c: Context) => {
   const user = await getUserFromRequest(c);
   const profile = await ensureProfile(c, user);
   return { user, profile };
 };
 
-export const requireAdmin = async (c) => {
+export const requireAdmin = async (c: Context) => {
   const auth = await requireUser(c);
   if (auth.profile.role !== 'admin') {
     throw forbidden('Admin access required.');

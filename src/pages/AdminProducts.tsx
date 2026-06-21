@@ -4,7 +4,9 @@ import { ArrowUp, ArrowDown, Upload } from 'lucide-react';
 import { apiRequest, uploadFile } from '../lib/api';
 import { formatIDR } from '../lib/currency';
 
-const emptyProduct = {
+import { Product } from '../types';
+
+const emptyProduct: any = {
   name: '',
   slug: '',
   description: '',
@@ -16,9 +18,9 @@ const emptyProduct = {
 };
 
 const AdminProducts = () => {
-  const [products, setProducts] = useState([]);
-  const [form, setForm] = useState(emptyProduct);
-  const [editingId, setEditingId] = useState(null);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [form, setForm] = useState<any>(emptyProduct);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -39,7 +41,7 @@ const AdminProducts = () => {
 
   useEffect(() => {
     loadProducts()
-      .catch((error) => toast.error(error.message))
+      .catch((error: any) => toast.error(error.message))
       .finally(() => setIsLoading(false));
   }, []);
 
@@ -61,8 +63,8 @@ const AdminProducts = () => {
     });
   }, [editingProduct]);
 
-  const updateField = (field, value) => {
-    setForm((current) => ({ ...current, [field]: value }));
+  const updateField = (field: string, value: any) => {
+    setForm((current: any) => ({ ...current, [field]: value }));
   };
 
   const resetForm = () => {
@@ -70,7 +72,7 @@ const AdminProducts = () => {
     setForm(emptyProduct);
   };
 
-  const handleImageUpload = async (event) => {
+  const handleImageUpload = async (event: any) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -79,15 +81,15 @@ const AdminProducts = () => {
       const { url } = await uploadFile('/api/media', file);
       updateField('image', url);
       toast.success('Image uploaded');
-    } catch (error) {
+    } catch (error: any) {
       toast.error(error.message);
     } finally {
       setIsUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
+      if (fileInputRef.current) (fileInputRef.current as HTMLInputElement).value = '';
     }
   };
 
-  const saveProduct = async (event) => {
+  const saveProduct = async (event: React.FormEvent) => {
     event.preventDefault();
     setIsSaving(true);
 
@@ -98,14 +100,14 @@ const AdminProducts = () => {
       await loadProducts();
       toast.success(editingId ? 'Product updated' : 'Product created');
       resetForm();
-    } catch (error) {
+    } catch (error: any) {
       toast.error(error.message);
     } finally {
       setIsSaving(false);
     }
   };
 
-  const deleteProduct = async (product) => {
+  const deleteProduct = async (product: Product) => {
     if (!window.confirm(`Delete ${product.name}? This cannot be undone.`)) return;
 
     try {
@@ -113,16 +115,16 @@ const AdminProducts = () => {
       await loadProducts();
       toast.success('Product deleted');
       if (editingId === product.id) resetForm();
-    } catch (error) {
+    } catch (error: any) {
       toast.error(error.message);
     }
   };
 
-  const moveProduct = (index, direction) => {
+  const moveProduct = (index: number, direction: number) => {
     const target = index + direction;
     if (target < 0 || target >= products.length) return;
 
-    setProducts((current) => {
+    setProducts((current: any) => {
       const next = [...current];
       [next[index], next[target]] = [next[target], next[index]];
       return next;
@@ -141,7 +143,7 @@ const AdminProducts = () => {
       setProducts(nextProducts);
       setOrderDirty(false);
       toast.success('Order saved');
-    } catch (error) {
+    } catch (error: any) {
       toast.error(error.message);
     } finally {
       setIsSavingOrder(false);

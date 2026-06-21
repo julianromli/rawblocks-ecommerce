@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 
-const FadeIn = ({ children, delay = 0, className = "", direction = "up" }) => {
+const FadeIn = ({ children, delay = 0, className = "", direction = "up" }: { children: React.ReactNode, delay?: number, className?: string, direction?: "up" | "down" | "left" | "right" | "none" }) => {
   const directions = {
     up: { y: 30, x: 0 },
     down: { y: -30, x: 0 },

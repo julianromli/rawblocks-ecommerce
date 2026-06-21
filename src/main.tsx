@@ -4,14 +4,14 @@ import '@fontsource/geist-sans/400.css'
 import '@fontsource/geist-sans/500.css'
 import '@fontsource/geist-mono/400.css'
 import './index.css'
-import App from './App.jsx'
-import { CartProvider } from './context/CartContext.jsx'
-import { AuthProvider } from './context/AuthContext.jsx'
-import { authClient } from './lib/neonClient.js'
+import App from './App';
+import { CartProvider } from './context/CartContext';
+import { AuthProvider } from './context/AuthContext';
+import { authClient } from './lib/neonClient';
 import { NeonAuthUIProvider } from '@neondatabase/auth-ui'
 import { Toaster } from 'sonner'
 
-const AppProviders = ({ children }) => {
+const AppProviders = ({ children }: { children: React.ReactNode }) => {
   const content = (
     <AuthProvider>
       <CartProvider>{children}</CartProvider>
@@ -23,13 +23,13 @@ const AppProviders = ({ children }) => {
   }
 
   return (
-    <NeonAuthUIProvider authClient={authClient} redirectTo="/">
+    <NeonAuthUIProvider authClient={authClient as any} redirectTo="/">
       {content}
     </NeonAuthUIProvider>
   )
 }
 
-createRoot(document.getElementById('root')).render(
+createRoot(document.getElementById('root') as HTMLElement).render(
   <StrictMode>
     <AppProviders>
       <Toaster position="bottom-right" toastOptions={{

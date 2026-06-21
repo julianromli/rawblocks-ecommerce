@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ArrowRight, ShoppingCart } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
@@ -8,23 +8,24 @@ import { formatIDR } from '../lib/currency';
 import { toast } from 'sonner';
 import ImageLoader from './ImageLoader';
 import FadeIn from './FadeIn';
+import { Product } from '../types';
 
 const NewDrops = () => {
   const { addToCart } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [products, setProducts] = useState([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
     apiRequest('/api/products', { auth: false })
       .then(({ products: nextProducts }) => setProducts(nextProducts))
-      .catch((nextError) => setError(nextError.message))
+      .catch((nextError: any) => setError(nextError.message))
       .finally(() => setIsLoading(false));
   }, []);
 
-  const handleAddToCart = async (e, product) => {
+  const handleAddToCart = async (e: React.MouseEvent, product: Product) => {
     e.stopPropagation();
     if (!user) {
       toast.message('Sign in to add items to your cart.');
@@ -35,7 +36,7 @@ const NewDrops = () => {
     try {
       await addToCart(product);
       toast.success(`${product.name} added to cart!`);
-    } catch (nextError) {
+    } catch (nextError: any) {
       toast.error(nextError.message);
     }
   };
@@ -60,7 +61,7 @@ const NewDrops = () => {
       {error && <p className="font-mono text-sm text-red-500">{error}</p>}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-        {products.map((product, index) => (
+        {products.map((product: Product, index: number) => (
           <FadeIn key={product.id} delay={index * 0.1} direction="up">
             <div className="group cursor-pointer">
               <div className="relative aspect-[4/5] mb-6 rounded-2xl overflow-hidden bg-gray-100">

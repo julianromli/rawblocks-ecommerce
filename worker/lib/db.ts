@@ -1,9 +1,7 @@
-import { neon } from '@neondatabase/serverless';
+import { neon, NeonQueryFunction } from '@neondatabase/serverless';
+import { Bindings } from '../types';
 
-// On Cloudflare Workers there is no process.env; secrets arrive via `env`
-// (bound from wrangler.toml / `wrangler secret`). The Neon client must be
-// created per-request from the request-scoped env rather than at module load.
-export const getSql = (env) => {
+export const getSql = (env: Bindings): NeonQueryFunction<false, false> => {
   const databaseUrl = env.DATABASE_URL;
   if (!databaseUrl) {
     throw new Error('DATABASE_URL is required for Neon database access.');
@@ -11,7 +9,20 @@ export const getSql = (env) => {
   return neon(databaseUrl);
 };
 
-export const mapProduct = (product) => ({
+export interface ProductRow {
+  id: string;
+  name: string;
+  slug: string;
+  description: string;
+  price_cents: number;
+  original_price_cents: number | null;
+  image_url: string;
+  is_new: boolean;
+  is_active: boolean;
+  sort_order: number;
+}
+
+export const mapProduct = (product: ProductRow | any) => ({
   id: product.id,
   name: product.name,
   slug: product.slug,
@@ -24,7 +35,7 @@ export const mapProduct = (product) => ({
   sortOrder: product.sort_order,
 });
 
-export const mapCartItem = (item) => ({
+export const mapCartItem = (item: any) => ({
   ...mapProduct(item),
   quantity: item.quantity,
 });

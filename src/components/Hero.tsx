@@ -57,9 +57,9 @@ const slides = [
 const Hero = () => {
   const [active, setActive] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
-  const timeoutRef = useRef(null);
+  const timeoutRef = useRef<number | null>(null);
 
-  const goTo = useCallback((index) => {
+  const goTo = useCallback((index: number) => {
     setActive(((index % slides.length) + slides.length) % slides.length);
   }, []);
 

@@ -3,15 +3,16 @@ import { requireAdmin } from '../lib/auth.js';
 import { getSql, mapProduct } from '../lib/db.js';
 import { badRequest, notFound, toErrorResponse } from '../lib/errors.js';
 import { deleteMediaByUrl } from './media.js';
+import { AppEnv } from '../types.js';
 
-const createSlug = (name) =>
+const createSlug = (name: string) =>
   name
     .toLowerCase()
     .trim()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '');
 
-const productFromBody = (body) => {
+const productFromBody = (body: any) => {
   const name = String(body.name || '').trim();
   const description = String(body.description || '').trim();
   const image = String(body.image || '').trim();
@@ -38,7 +39,7 @@ const productFromBody = (body) => {
   };
 };
 
-const products = new Hono();
+const products = new Hono<AppEnv>();
 
 products.get('/', async (c) => {
   try {
@@ -105,15 +106,15 @@ products.patch('/reorder', async (c) => {
       throw badRequest('An ordered array of product ids is required.');
     }
 
-    if (ids.some((id) => typeof id !== 'string' || !id)) {
+    if (ids.some((id: any) => typeof id !== 'string' || !id)) {
       throw badRequest('Product ids must be non-empty strings.');
     }
 
     // Build a parameterized VALUES list mapping id -> position, then update in
     // a single round-trip. Placeholders are numbered ($1, $2, ...) so values
     // are always sent safely as bind parameters (no string interpolation).
-    const tuples = ids.map((_, index) => `($${index * 2 + 1}::uuid, $${index * 2 + 2}::int)`);
-    const params = ids.flatMap((id, index) => [id, index + 1]);
+    const tuples = ids.map((_: any, index: number) => `($${index * 2 + 1}::uuid, $${index * 2 + 2}::int)`);
+    const params = ids.flatMap((id: string, index: number) => [id, index + 1]);
 
     const updateSql = `
       update products as p
@@ -131,7 +132,7 @@ products.patch('/reorder', async (c) => {
   }
 });
 
-const updateProductFromBody = (body) => {
+const updateProductFromBody = (body: any) => {
   const name = String(body.name || '').trim();
   const slug = String(body.slug || name)
     .toLowerCase()

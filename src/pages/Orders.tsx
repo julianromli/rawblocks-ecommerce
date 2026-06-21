@@ -1,11 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, PackageCheck } from 'lucide-react';
 import { apiRequest } from '../lib/api';
 import { formatIDR } from '../lib/currency';
 
 const Orders = () => {
-  const [orders, setOrders] = useState([]);
+  const [orders, setOrders] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -57,7 +57,7 @@ const Orders = () => {
             </div>
 
             <div className="space-y-3">
-              {order.items.map((item) => (
+              {order.items.map((item: any) => (
                 <div key={item.id} className="flex justify-between gap-4 font-mono text-sm">
                   <span>{item.name} x {item.quantity}</span>
                   <span>{formatIDR(item.price * item.quantity)}</span>

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { Link, useNavigate } from 'react-router-dom';
@@ -31,11 +31,11 @@ const Checkout = () => {
     }
   }, [profile?.email]);
 
-  const updateField = (field, value) => {
+  const updateField = (field: string, value: any) => {
     setForm((current) => ({ ...current, [field]: value }));
   };
 
-  const submitOrder = async (event) => {
+  const submitOrder = async (event: React.FormEvent) => {
     event.preventDefault();
     setIsSubmitting(true);
 
@@ -47,7 +47,7 @@ const Checkout = () => {
       clearCart();
       toast.success(`Order #${order.id.slice(0, 8)} created`);
       navigate('/orders');
-    } catch (error) {
+    } catch (error: any) {
       toast.error(error.message);
     } finally {
       setIsSubmitting(false);

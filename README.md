@@ -7,6 +7,7 @@ Live: https://rawblocks.faizintifada.com
 ## Tech Stack
 
 - **Frontend:** React 19, React Router, Tailwind CSS v4, Framer Motion
+- **Language:** TypeScript (Strict Mode)
 - **API:** Hono on Cloudflare Workers (`worker/`)
 - **Database:** Neon (serverless Postgres) via `@neondatabase/serverless`
 - **Auth:** Neon Auth (JWT verified with `jose` against a JWKS endpoint)
@@ -17,24 +18,25 @@ Live: https://rawblocks.faizintifada.com
 
 This is a single fullstack Cloudflare Worker:
 
-- `worker/index.js` mounts the Hono app and routes all `/api/*` requests.
+- `worker/index.ts` mounts the Hono app and routes all `/api/*` requests.
 - Static assets (the built React SPA) are served by Cloudflare Assets. Unmatched non-API routes fall back to `index.html` so the client-side router works.
 - `run_worker_first = ["/api/*"]` in `wrangler.toml` ensures API requests always hit the Worker and are never swallowed by the SPA fallback.
 - Product images are uploaded to a Cloudflare R2 bucket (`MEDIA` binding) and served back through `/api/media/*`.
 
 ```
 worker/
-  index.js          # Hono app, mounts /api routes
+  index.ts          # Hono app, mounts /api routes
+  types.ts          # TypeScript interfaces for Bindings and environment
   lib/
-    db.js           # Neon client (per-request, from env) + row mappers
-    auth.js         # JWT verification + profile/role resolution
-    errors.js       # ApiError + JSON error responses
+    db.ts           # Neon client (per-request, from env) + row mappers
+    auth.ts         # JWT verification + profile/role resolution
+    errors.ts       # ApiError + JSON error responses
   routes/
-    products.js     # GET/POST /api/products, PATCH/DELETE /api/products/:id, PATCH /api/products/reorder
-    cart.js         # GET/PUT/PATCH/DELETE /api/cart
-    orders.js       # GET/POST /api/orders
-    me.js           # GET /api/me
-    media.js        # POST /api/media (upload), GET /api/media/* (serve)
+    products.ts     # GET/POST /api/products, PATCH/DELETE /api/products/:id, PATCH /api/products/reorder
+    cart.ts         # GET/PUT/PATCH/DELETE /api/cart
+    orders.ts       # GET/POST /api/orders
+    me.ts           # GET /api/me
+    media.ts        # POST /api/media (upload), GET /api/media/* (serve)
 ```
 
 ## API Endpoints
@@ -128,6 +130,7 @@ The Cloudflare Vite plugin runs the Worker (API) and the React app together on a
 | `npm run build` | Build the client and Worker bundles |
 | `npm run preview` | Preview the production build locally |
 | `npm run deploy` | Build and deploy to Cloudflare Workers |
+| `npm run typecheck`| Run TypeScript compiler to typecheck without emitting files |
 | `npm run lint` | Run ESLint |
 
 ## Deployment

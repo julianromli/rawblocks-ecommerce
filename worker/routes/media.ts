@@ -2,11 +2,13 @@ import { Hono } from 'hono';
 import { requireAdmin } from '../lib/auth.js';
 import { badRequest, notFound, toErrorResponse } from '../lib/errors.js';
 
+import { AppEnv, Bindings } from '../types.js';
+
 const MAX_BYTES = 5 * 1024 * 1024; // 5 MB
 
 // Map allowed mime types to file extensions. Keeps uploads to known image
 // formats and prevents arbitrary content being stored/served.
-const ALLOWED_TYPES = {
+const ALLOWED_TYPES: Record<string, string> = {
   'image/jpeg': 'jpg',
   'image/png': 'png',
   'image/webp': 'webp',
@@ -14,14 +16,14 @@ const ALLOWED_TYPES = {
   'image/gif': 'gif',
 };
 
-const getBucket = (env) => {
+const getBucket = (env: Bindings) => {
   if (!env.MEDIA) {
     throw new Error('MEDIA R2 bucket binding is not configured.');
   }
   return env.MEDIA;
 };
 
-const randomKey = (ext) => {
+const randomKey = (ext: string) => {
   // crypto.randomUUID is available in the Workers runtime.
   const id = crypto.randomUUID();
   return `products/${id}.${ext}`;
@@ -31,7 +33,7 @@ const randomKey = (ext) => {
 // media URL we manage (i.e. served via /api/media/products/...). External URLs
 // or anything outside the products/ prefix return null so we never delete
 // objects we don't own.
-export const mediaKeyFromUrl = (value) => {
+export const mediaKeyFromUrl = (value: any) => {
   if (!value || typeof value !== 'string') return null;
   const match = value.match(/\/api\/media\/(products\/[A-Za-z0-9._-]+)$/);
   return match ? match[1] : null;
@@ -39,7 +41,7 @@ export const mediaKeyFromUrl = (value) => {
 
 // Best-effort delete of a managed media object. Never throws: image cleanup
 // must not block the primary product update/delete operation.
-export const deleteMediaByUrl = async (env, value) => {
+export const deleteMediaByUrl = async (env: Bindings, value: any) => {
   try {
     const key = mediaKeyFromUrl(value);
     if (!key || !env.MEDIA) return;
@@ -49,7 +51,7 @@ export const deleteMediaByUrl = async (env, value) => {
   }
 };
 
-const media = new Hono();
+const media = new Hono<AppEnv>();
 
 // Upload a single image (admin only). Accepts multipart/form-data with a
 // `file` field. Returns the public URL the storefront should use.
@@ -75,7 +77,7 @@ media.post('/', async (c) => {
     }
 
     const key = randomKey(ext);
-    await bucket.put(key, file.stream(), {
+    await bucket.put(key, file.stream() as any, {
       httpMetadata: { contentType: file.type },
     });
 
@@ -102,11 +104,11 @@ media.get('/*', async (c) => {
     }
 
     const headers = new Headers();
-    object.writeHttpMetadata(headers);
+    object.writeHttpMetadata(headers as any);
     headers.set('etag', object.httpEtag);
     headers.set('Cache-Control', 'public, max-age=31536000, immutable');
 
-    return new Response(object.body, { headers });
+    return new Response(object.body as any, { headers });
   } catch (error) {
     return toErrorResponse(c, error);
   }

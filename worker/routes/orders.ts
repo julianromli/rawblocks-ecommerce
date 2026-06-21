@@ -3,10 +3,12 @@ import { requireUser } from '../lib/auth.js';
 import { getSql } from '../lib/db.js';
 import { badRequest, toErrorResponse } from '../lib/errors.js';
 
+import { AppEnv } from '../types.js';
+
 // Flat shipping fee in whole IDR rupiah.
 const SHIPPING_CENTS = 262500;
 
-const readOrders = async (sql, userId) => {
+const readOrders = async (sql: any, userId: string) => {
   const orders = await sql`
     select *
     from orders
@@ -18,7 +20,7 @@ const readOrders = async (sql, userId) => {
     return [];
   }
 
-  const orderIds = orders.map((order) => order.id);
+  const orderIds = orders.map((order: any) => order.id);
   const items = await sql`
     select *
     from order_items
@@ -26,7 +28,7 @@ const readOrders = async (sql, userId) => {
     order by created_at asc
   `;
 
-  return orders.map((order) => ({
+  return orders.map((order: any) => ({
     id: order.id,
     status: order.status,
     email: order.email,
@@ -36,8 +38,8 @@ const readOrders = async (sql, userId) => {
     shippingDetails: order.shipping_details,
     createdAt: order.created_at,
     items: items
-      .filter((item) => item.order_id === order.id)
-      .map((item) => ({
+      .filter((item: any) => item.order_id === order.id)
+      .map((item: any) => ({
         id: item.id,
         productId: item.product_id,
         name: item.product_name,
@@ -47,8 +49,8 @@ const readOrders = async (sql, userId) => {
   }));
 };
 
-const validateShipping = (body, fallbackEmail) => {
-  const shippingDetails = {
+const validateShipping = (body: any, fallbackEmail: string) => {
+  const shippingDetails: any = {
     email: String(body.email || fallbackEmail || '').trim(),
     firstName: String(body.firstName || '').trim(),
     lastName: String(body.lastName || '').trim(),
@@ -69,7 +71,7 @@ const validateShipping = (body, fallbackEmail) => {
   return shippingDetails;
 };
 
-const orders = new Hono();
+const orders = new Hono<AppEnv>();
 
 orders.get('/', async (c) => {
   try {

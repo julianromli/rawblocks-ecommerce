@@ -1,12 +1,27 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { authClient } from '../lib/neonClient';
 import { apiRequest, setAccessTokenProvider } from '../lib/api';
+import { UserProfile } from '../types';
 
-const AuthContext = createContext(null);
+export interface AuthContextType {
+  authClient: any;
+  isConfigured: boolean;
+  isLoading: boolean;
+  session: any;
+  user: any;
+  profile: UserProfile | null;
+  isAdmin: boolean;
+  refreshSession: () => Promise<any>;
+  refreshProfile: () => Promise<UserProfile | null>;
+  getAccessToken: () => Promise<string | null>;
+  signOut: () => Promise<void>;
+}
 
-const sessionUser = (session) => session?.user || session?.data?.user || session?.session?.user || null;
+const AuthContext = createContext<AuthContextType | null>(null);
 
-const sessionToken = (session) =>
+const sessionUser = (session: any) => session?.user || session?.data?.user || session?.session?.user || null;
+
+const sessionToken = (session: any) =>
   session?.accessToken ||
   session?.access_token ||
   session?.token ||
@@ -28,9 +43,9 @@ export const useAuth = () => {
   return value;
 };
 
-export const AuthProvider = ({ children }) => {
-  const [session, setSession] = useState(null);
-  const [profile, setProfile] = useState(null);
+export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
+  const [session, setSession] = useState<any>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(Boolean(authClient));
   const currentUser = useMemo(() => sessionUser(session), [session]);
   const currentUserId = currentUser?.id || currentUser?.sub || null;

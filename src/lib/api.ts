@@ -1,10 +1,10 @@
-let accessTokenProvider = null;
+let accessTokenProvider: (() => Promise<string | null>) | null = null;
 
-export const setAccessTokenProvider = (provider) => {
+export const setAccessTokenProvider = (provider: (() => Promise<string | null>) | null) => {
   accessTokenProvider = provider;
 };
 
-export const apiRequest = async (path, options = {}) => {
+export const apiRequest = async (path: string, options: any = {}) => {
   const headers = new Headers(options.headers);
 
   if (options.body && !headers.has('Content-Type')) {
@@ -36,7 +36,7 @@ export const apiRequest = async (path, options = {}) => {
 
 // Upload a file via multipart/form-data. Keeps the same auth/token handling as
 // apiRequest but lets the browser set the multipart Content-Type boundary.
-export const uploadFile = async (path, file, options = {}) => {
+export const uploadFile = async (path: string, file: File, options: any = {}) => {
   const headers = new Headers(options.headers);
 
   if (options.auth !== false) {

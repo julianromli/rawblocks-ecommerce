@@ -2,7 +2,9 @@ import { Hono } from 'hono';
 import { requireUser } from '../lib/auth.js';
 import { toErrorResponse } from '../lib/errors.js';
 
-const me = new Hono();
+import { AppEnv } from '../types.js';
+
+const me = new Hono<AppEnv>();
 
 me.get('/', async (c) => {
   try {

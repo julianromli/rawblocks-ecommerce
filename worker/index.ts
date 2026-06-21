@@ -4,13 +4,14 @@ import cart from './routes/cart.js';
 import orders from './routes/orders.js';
 import me from './routes/me.js';
 import media from './routes/media.js';
+import { AppEnv } from './types.js';
 
 // The Worker only handles `/api/*` requests (see `run_worker_first` in
 // wrangler.toml). Static assets and the SPA fallback are served by the
 // Cloudflare Assets platform, not this code.
-const app = new Hono();
+const app = new Hono<AppEnv>();
 
-const api = new Hono();
+const api = new Hono<AppEnv>();
 api.route('/products', products);
 api.route('/cart', cart);
 api.route('/orders', orders);
