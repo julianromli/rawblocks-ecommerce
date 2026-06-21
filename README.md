@@ -10,6 +10,7 @@ Live: https://rawblocks.faizintifada.workers.dev/
 - **API:** Hono on Cloudflare Workers (`worker/`)
 - **Database:** Neon (serverless Postgres) via `@neondatabase/serverless`
 - **Auth:** Neon Auth (JWT verified with `jose` against a JWKS endpoint)
+- **Media:** Cloudflare R2 (product image uploads, served back via the Worker)
 - **Tooling:** Vite 8 + `@cloudflare/vite-plugin`, Wrangler
 
 ## Architecture
@@ -19,6 +20,7 @@ This is a single fullstack Cloudflare Worker:
 - `worker/index.js` mounts the Hono app and routes all `/api/*` requests.
 - Static assets (the built React SPA) are served by Cloudflare Assets. Unmatched non-API routes fall back to `index.html` so the client-side router works.
 - `run_worker_first = ["/api/*"]` in `wrangler.toml` ensures API requests always hit the Worker and are never swallowed by the SPA fallback.
+- Product images are uploaded to a Cloudflare R2 bucket (`MEDIA` binding) and served back through `/api/media/*`.
 
 ```
 worker/
@@ -28,20 +30,24 @@ worker/
     auth.js         # JWT verification + profile/role resolution
     errors.js       # ApiError + JSON error responses
   routes/
-    products.js     # GET/POST /api/products, PATCH/DELETE /api/products/:id
+    products.js     # GET/POST /api/products, PATCH/DELETE /api/products/:id, PATCH /api/products/reorder
     cart.js         # GET/PUT/PATCH/DELETE /api/cart
     orders.js       # GET/POST /api/orders
     me.js           # GET /api/me
+    media.js        # POST /api/media (upload), GET /api/media/* (serve)
 ```
 
 ## API Endpoints
 
 | Method | Path | Auth | Description |
 | --- | --- | --- | --- |
-| `GET` | `/api/products` | none | List active products (`?includeInactive=true` requires admin) |
-| `POST` | `/api/products` | admin | Create a product |
+| `GET` | `/api/products` | none | List active products, sorted by manual order (`?includeInactive=true` requires admin) |
+| `POST` | `/api/products` | admin | Create a product (appended to the end of the manual order) |
+| `PATCH` | `/api/products/reorder` | admin | Persist a manual product ordering (`{ ids: [...] }`) |
 | `PATCH` | `/api/products/:id` | admin | Update a product |
-| `DELETE` | `/api/products/:id` | admin | Delete a product |
+| `DELETE` | `/api/products/:id` | admin | Delete a product (also removes its managed R2 image) |
+| `POST` | `/api/media` | admin | Upload a product image (`multipart/form-data`, `file` field; JPEG/PNG/WebP/AVIF/GIF, max 5 MB) |
+| `GET` | `/api/media/*` | none | Serve an uploaded image |
 | `GET` | `/api/me` | user | Current user + role |
 | `GET` | `/api/cart` | user | Get cart items |
 | `PUT` | `/api/cart` | user | Set item quantity |
@@ -90,9 +96,23 @@ NEON_AUTH_AUDIENCE=""
 
 ### 3. Apply the database schema
 
-Run the migration in `migrations/001_initial_neon.sql` against your Neon database (e.g. via the Neon SQL editor or `psql`).
+Run the migrations in `migrations/` against your Neon database in order (e.g. via the Neon SQL editor or `psql`):
 
-### 4. Run locally
+- `001_initial_neon.sql` — initial schema (products, cart, orders, etc.)
+- `002_product_sort_order.sql` — adds manual product ordering (`sort_order`)
+- `003_idr_currency.sql` — converts stored monetary values from USD cents to whole IDR rupiah
+
+> Monetary `*_cents` columns hold whole Indonesian rupiah (IDR), not sub-units. Migration `003` is idempotent-guarded via a `schema_migrations` marker, so it won't double-convert on re-run.
+
+### 4. Create the R2 bucket (for image uploads)
+
+Product images are stored in Cloudflare R2 under the `MEDIA` binding (see `wrangler.toml`). Create the bucket once:
+
+```bash
+wrangler r2 bucket create rawblocks-media
+```
+
+### 5. Run locally
 
 ```bash
 npm run dev
@@ -113,6 +133,12 @@ The Cloudflare Vite plugin runs the Worker (API) and the React app together on a
 ## Deployment
 
 Deploys to Cloudflare Workers via Wrangler. Configuration lives in `wrangler.toml`.
+
+### Create the R2 bucket (once)
+
+```bash
+wrangler r2 bucket create rawblocks-media
+```
 
 ### Set production secrets (once)
 
