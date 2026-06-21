@@ -21,6 +21,7 @@ export const mapProduct = (product) => ({
   image: product.image_url,
   isNew: product.is_new,
   isActive: product.is_active,
+  sortOrder: product.sort_order,
 });
 
 export const mapCartItem = (item) => ({

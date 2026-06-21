@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { requireAdmin } from '../lib/auth.js';
 import { getSql, mapProduct } from '../lib/db.js';
 import { badRequest, notFound, toErrorResponse } from '../lib/errors.js';
+import { deleteMediaByUrl } from './media.js';
 
 const createSlug = (name) =>
   name
@@ -49,8 +50,8 @@ products.get('/', async (c) => {
     }
 
     const rows = includeInactive
-      ? await sql`select * from products order by created_at desc`
-      : await sql`select * from products where is_active = true order by created_at desc`;
+      ? await sql`select * from products order by sort_order asc, created_at desc`
+      : await sql`select * from products where is_active = true order by sort_order asc, created_at desc`;
 
     return c.json({ products: rows.map(mapProduct) });
   } catch (error) {
@@ -63,8 +64,14 @@ products.post('/', async (c) => {
     await requireAdmin(c);
     const sql = getSql(c.env);
     const product = productFromBody(await c.req.json());
+
+    // New products append to the end of the manual order.
+    const [{ next_order: nextOrder }] = await sql`
+      select coalesce(max(sort_order), 0) + 1 as next_order from products
+    `;
+
     const [created] = await sql`
-      insert into products (name, slug, description, price_cents, original_price_cents, image_url, is_new, is_active)
+      insert into products (name, slug, description, price_cents, original_price_cents, image_url, is_new, is_active, sort_order)
       values (
         ${product.name},
         ${product.slug},
@@ -73,12 +80,52 @@ products.post('/', async (c) => {
         ${product.originalPriceCents},
         ${product.image},
         ${product.isNew},
-        ${product.isActive}
+        ${product.isActive},
+        ${nextOrder}
       )
       returning *
     `;
 
     return c.json({ product: mapProduct(created) }, 201);
+  } catch (error) {
+    return toErrorResponse(c, error);
+  }
+});
+
+// Persist a manual ordering of products. Body: { ids: [id, id, ...] } in the
+// desired display order. sort_order is reassigned 1..N to match the array.
+products.patch('/reorder', async (c) => {
+  try {
+    await requireAdmin(c);
+    const sql = getSql(c.env);
+    const body = await c.req.json();
+    const ids = Array.isArray(body.ids) ? body.ids : null;
+
+    if (!ids || ids.length === 0) {
+      throw badRequest('An ordered array of product ids is required.');
+    }
+
+    if (ids.some((id) => typeof id !== 'string' || !id)) {
+      throw badRequest('Product ids must be non-empty strings.');
+    }
+
+    // Build a parameterized VALUES list mapping id -> position, then update in
+    // a single round-trip. Placeholders are numbered ($1, $2, ...) so values
+    // are always sent safely as bind parameters (no string interpolation).
+    const tuples = ids.map((_, index) => `($${index * 2 + 1}::uuid, $${index * 2 + 2}::int)`);
+    const params = ids.flatMap((id, index) => [id, index + 1]);
+
+    const updateSql = `
+      update products as p
+      set sort_order = v.position, updated_at = now()
+      from (values ${tuples.join(', ')}) as v(id, position)
+      where p.id = v.id
+    `;
+
+    await sql.query(updateSql, params);
+
+    const rows = await sql`select * from products order by sort_order asc, created_at desc`;
+    return c.json({ products: rows.map(mapProduct) });
   } catch (error) {
     return toErrorResponse(c, error);
   }
@@ -127,6 +174,9 @@ products.delete('/:id', async (c) => {
       throw notFound('Product not found');
     }
 
+    // Remove the associated R2 image (no-op for external URLs).
+    await deleteMediaByUrl(c.env, deleted.image_url);
+
     return c.json({ product: mapProduct(deleted) });
   } catch (error) {
     return toErrorResponse(c, error);
@@ -139,6 +189,12 @@ products.patch('/:id', async (c) => {
     const sql = getSql(c.env);
     const id = c.req.param('id');
     const product = updateProductFromBody(await c.req.json());
+
+    // Capture the existing image so we can clean up R2 if it gets replaced.
+    const [existing] = await sql`select image_url from products where id = ${id}`;
+    if (!existing) {
+      throw notFound('Product not found');
+    }
 
     const [updated] = await sql`
       update products set
@@ -157,6 +213,11 @@ products.patch('/:id', async (c) => {
 
     if (!updated) {
       throw notFound('Product not found');
+    }
+
+    // If the image changed, delete the old managed R2 object (no-op otherwise).
+    if (existing.image_url !== updated.image_url) {
+      await deleteMediaByUrl(c.env, existing.image_url);
     }
 
     return c.json({ product: mapProduct(updated) });

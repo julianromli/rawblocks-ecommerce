@@ -1,6 +1,7 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { apiRequest } from '../lib/api';
+import { ArrowUp, ArrowDown, Upload } from 'lucide-react';
+import { apiRequest, uploadFile } from '../lib/api';
 
 const emptyProduct = {
   name: '',
@@ -19,6 +20,10 @@ const AdminProducts = () => {
   const [editingId, setEditingId] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [orderDirty, setOrderDirty] = useState(false);
+  const [isSavingOrder, setIsSavingOrder] = useState(false);
+  const fileInputRef = useRef(null);
 
   const editingProduct = useMemo(
     () => products.find((product) => product.id === editingId),
@@ -28,6 +33,7 @@ const AdminProducts = () => {
   const loadProducts = async () => {
     const { products: nextProducts } = await apiRequest('/api/products?includeInactive=true');
     setProducts(nextProducts);
+    setOrderDirty(false);
   };
 
   useEffect(() => {
@@ -63,6 +69,23 @@ const AdminProducts = () => {
     setForm(emptyProduct);
   };
 
+  const handleImageUpload = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    try {
+      const { url } = await uploadFile('/api/media', file);
+      updateField('image', url);
+      toast.success('Image uploaded');
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
   const saveProduct = async (event) => {
     event.preventDefault();
     setIsSaving(true);
@@ -94,6 +117,36 @@ const AdminProducts = () => {
     }
   };
 
+  const moveProduct = (index, direction) => {
+    const target = index + direction;
+    if (target < 0 || target >= products.length) return;
+
+    setProducts((current) => {
+      const next = [...current];
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
+    setOrderDirty(true);
+  };
+
+  const saveOrder = async () => {
+    setIsSavingOrder(true);
+    try {
+      const ids = products.map((product) => product.id);
+      const { products: nextProducts } = await apiRequest('/api/products/reorder', {
+        method: 'PATCH',
+        body: { ids },
+      });
+      setProducts(nextProducts);
+      setOrderDirty(false);
+      toast.success('Order saved');
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setIsSavingOrder(false);
+    }
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-4 md:px-12 py-12">
       <div className="mb-10">
@@ -108,7 +161,30 @@ const AdminProducts = () => {
           <input value={form.name} onChange={(event) => updateField('name', event.target.value)} placeholder="Name" className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-black" />
           <input value={form.slug} onChange={(event) => updateField('slug', event.target.value)} placeholder="Slug (optional)" className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-black" />
           <textarea value={form.description} onChange={(event) => updateField('description', event.target.value)} placeholder="Description" rows={4} className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-black" />
-          <input value={form.image} onChange={(event) => updateField('image', event.target.value)} placeholder="Image URL" className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-black" />
+
+          <div className="space-y-3">
+            {form.image && (
+              <img src={form.image} alt="Preview" className="w-full h-44 rounded-2xl object-cover bg-gray-100" />
+            )}
+            <div className="flex gap-3">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/avif,image/gif"
+                onChange={handleImageUpload}
+                className="hidden"
+                id="product-image-upload"
+              />
+              <label
+                htmlFor="product-image-upload"
+                className={`flex items-center justify-center gap-2 flex-1 border border-gray-300 rounded-xl px-4 py-3 font-mono text-sm cursor-pointer hover:bg-gray-50 ${isUploading ? 'opacity-60 pointer-events-none' : ''}`}
+              >
+                <Upload size={16} />
+                {isUploading ? 'Uploading...' : 'Upload image'}
+              </label>
+            </div>
+            <input value={form.image} onChange={(event) => updateField('image', event.target.value)} placeholder="Or paste image URL" className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-black" />
+          </div>
 
           <div className="grid grid-cols-2 gap-3">
             <input value={form.price} onChange={(event) => updateField('price', event.target.value)} placeholder="Price" type="number" step="0.01" min="0" className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-black" />
@@ -137,9 +213,43 @@ const AdminProducts = () => {
         </form>
 
         <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="font-mono text-xs text-gray-500 uppercase">
+              Storefront order — top item shows first
+            </p>
+            {orderDirty && (
+              <button
+                onClick={saveOrder}
+                disabled={isSavingOrder}
+                className="rounded-full bg-black px-5 py-2 text-xs font-bold uppercase text-white hover:bg-gray-800 disabled:opacity-60"
+              >
+                {isSavingOrder ? 'Saving...' : 'Save order'}
+              </button>
+            )}
+          </div>
+
           {isLoading && <p className="font-mono text-sm text-gray-500">Loading products...</p>}
-          {products.map((product) => (
+          {products.map((product, index) => (
             <article key={product.id} className="rounded-3xl border border-gray-200 bg-white p-4 flex flex-col md:flex-row gap-5">
+              <div className="flex md:flex-col items-center justify-center gap-2">
+                <button
+                  onClick={() => moveProduct(index, -1)}
+                  disabled={index === 0}
+                  aria-label="Move up"
+                  className="rounded-full border border-gray-300 p-2 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  <ArrowUp size={16} />
+                </button>
+                <span className="font-mono text-xs text-gray-400 w-6 text-center">{index + 1}</span>
+                <button
+                  onClick={() => moveProduct(index, 1)}
+                  disabled={index === products.length - 1}
+                  aria-label="Move down"
+                  className="rounded-full border border-gray-300 p-2 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  <ArrowDown size={16} />
+                </button>
+              </div>
               <img src={product.image} alt={product.name} className="w-full md:w-32 h-40 md:h-32 rounded-2xl object-cover bg-gray-100" />
               <div className="flex-1">
                 <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">

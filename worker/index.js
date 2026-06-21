@@ -3,6 +3,7 @@ import products from './routes/products.js';
 import cart from './routes/cart.js';
 import orders from './routes/orders.js';
 import me from './routes/me.js';
+import media from './routes/media.js';
 
 // The Worker only handles `/api/*` requests (see `run_worker_first` in
 // wrangler.toml). Static assets and the SPA fallback are served by the
@@ -14,6 +15,7 @@ api.route('/products', products);
 api.route('/cart', cart);
 api.route('/orders', orders);
 api.route('/me', me);
+api.route('/media', media);
 
 app.route('/api', api);
 
