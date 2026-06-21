@@ -22,7 +22,10 @@ const Checkout = () => {
     city: '',
     postalCode: '',
   });
-  const shipping = cartTotal > 0 ? 262500 : 0;
+  // Mirror the backend rule: shipping is free when the cart contains only the
+  // test product (slug 'test-product'); otherwise flat shipping applies.
+  const hasShippable = cartItems.some((item) => item.slug !== 'test-product');
+  const shipping = cartTotal > 0 && hasShippable ? 262500 : 0;
   const total = cartTotal + shipping;
 
   useEffect(() => {
@@ -45,6 +48,14 @@ const Checkout = () => {
         body: form,
       });
       clearCart();
+
+      if (order.paymentLink) {
+        toast.success('Redirecting to secure payment...');
+        // Hand off to Mayar's hosted checkout page.
+        window.location.href = order.paymentLink;
+        return;
+      }
+
       toast.success(`Order #${order.id.slice(0, 8)} created`);
       navigate('/orders');
     } catch (error: any) {
@@ -146,11 +157,13 @@ const Checkout = () => {
               <section>
                 <h2 className="text-xl font-bold uppercase mb-4">Payment</h2>
                 <p className="text-sm text-gray-500 mb-4 flex items-center gap-2">
-                  <ShieldCheck size={16} /> Payment processing is not enabled yet.
+                  <ShieldCheck size={16} /> Secure payment powered by Mayar.
                 </p>
                 <div className="space-y-4 bg-gray-50 p-6 rounded-2xl border border-gray-200">
                   <p className="font-mono text-sm text-gray-500">
-                    This checkout creates a pending Neon order. Add Stripe or another processor before collecting payment details.
+                    After placing your order you'll be redirected to Mayar's secure
+                    checkout to complete payment via bank transfer, e-wallet, QRIS,
+                    or card.
                   </p>
                 </div>
               </section>
@@ -160,7 +173,7 @@ const Checkout = () => {
                 disabled={isSubmitting}
                 className="w-full bg-black text-white py-4 rounded-full font-bold uppercase tracking-wide hover:bg-gray-800 transition-colors text-lg mt-4 disabled:opacity-60"
               >
-                {isSubmitting ? 'Placing order...' : `Place order ${formatIDR(total)}`}
+                {isSubmitting ? 'Redirecting to payment...' : `Pay ${formatIDR(total)}`}
               </button>
             </form>
           </FadeIn>

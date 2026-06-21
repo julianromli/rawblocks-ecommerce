@@ -11,6 +11,7 @@ Live: https://rawblocks.faizintifada.com
 - **API:** Hono on Cloudflare Workers (`worker/`)
 - **Database:** Neon (serverless Postgres) via `@neondatabase/serverless`
 - **Auth:** Neon Auth (JWT verified with `jose` against a JWKS endpoint)
+- **Payments:** [Mayar](https://mayar.id) hosted checkout (single payment request + webhook reconciliation)
 - **Media:** Cloudflare R2 (product image uploads, served back via the Worker)
 - **Tooling:** Vite 8 + `@cloudflare/vite-plugin`, Wrangler
 
@@ -31,10 +32,12 @@ worker/
     db.ts           # Neon client (per-request, from env) + row mappers
     auth.ts         # JWT verification + profile/role resolution
     errors.ts       # ApiError + JSON error responses
+    mayar.ts        # Mayar API client (create payment request, get payment status)
   routes/
     products.ts     # GET/POST /api/products, PATCH/DELETE /api/products/:id, PATCH /api/products/reorder
     cart.ts         # GET/PUT/PATCH/DELETE /api/cart
-    orders.ts       # GET/POST /api/orders
+    orders.ts       # GET/POST /api/orders (creates a Mayar payment on checkout)
+    payments.ts     # POST/GET /api/payments/webhook/:token (Mayar webhook)
     me.ts           # GET /api/me
     media.ts        # POST /api/media (upload), GET /api/media/* (serve)
 ```
@@ -56,7 +59,40 @@ worker/
 | `PATCH` | `/api/cart` | user | Adjust item quantity by delta |
 | `DELETE` | `/api/cart` | user | Remove an item (`?productId=`) or clear cart |
 | `GET` | `/api/orders` | user | List orders |
-| `POST` | `/api/orders` | user | Create an order from the cart |
+| `POST` | `/api/orders` | user | Create an order from the cart and a Mayar payment request (returns `paymentLink`) |
+| `POST` | `/api/payments/webhook/:token` | token | Mayar webhook (`payment.received`); verifies with Mayar then marks the order `paid` |
+| `GET` | `/api/payments/webhook/:token` | token | Webhook health check (returns `{ ok: true }` for a valid token) |
+
+## Payments (Mayar)
+
+Checkout is processed through [Mayar](https://mayar.id) hosted checkout:
+
+1. `POST /api/orders` creates a `pending` order from the cart, then calls Mayar
+   `POST /hl/v1/payment/create` and stores the returned payment id, transaction
+   id, and hosted checkout link on the order.
+2. The client redirects the customer to the Mayar `paymentLink`.
+3. After payment, Mayar sends a `payment.received` event to
+   `POST /api/payments/webhook/:token`. The Worker authenticates the callback
+   via the secret `:token` in the URL, then **verifies the payment status
+   directly against the Mayar API** (`GET /hl/v1/payment/{id}`) before flipping
+   the order to `paid`. This defends against spoofed webhooks since Mayar does
+   not sign webhook bodies.
+4. Mayar redirects the customer back to `/orders?order=<id>`, which polls until
+   the order shows as `paid`.
+
+**Environment switch:** `MAYAR_ENV` selects the API base URL — `production`
+uses `https://api.mayar.id`, anything else (default) uses the sandbox
+`https://api.mayar.club`. `MAYAR_API_URL` can override the base URL explicitly.
+
+**Registering the webhook:** in the Mayar dashboard (Integration → Webhook),
+set the URL to:
+
+```
+https://<your-site>/api/payments/webhook/<MAYAR_WEBHOOK_TOKEN>
+```
+
+For local development, expose your dev server with a tunnel (e.g. `cloudflared`)
+and register that tunnel URL, since Mayar cannot reach `localhost`.
 
 ## Getting Started
 
@@ -92,7 +128,18 @@ NEON_AUTH_JWKS_URL="https://<your-neon-auth-domain>/.well-known/jwks.json"
 ADMIN_EMAIL="you@example.com"
 NEON_AUTH_ISSUER=""
 NEON_AUTH_AUDIENCE=""
+
+# Mayar payment gateway
+MAYAR_API_KEY="<your Mayar API key>"
+MAYAR_ENV="sandbox"            # 'production' uses api.mayar.id; otherwise sandbox
+MAYAR_WEBHOOK_TOKEN="<random secret used in the webhook URL>"
 ```
+
+> `MAYAR_API_KEY` comes from web.mayar.club (sandbox) or web.mayar.id
+> (production) → Integration → API Key. `MAYAR_WEBHOOK_TOKEN` is any random
+> string you choose; it authenticates the webhook callback. In production,
+> `PUBLIC_BASE_URL` (the site origin used to build payment redirect URLs) should
+> also be set — locally it defaults to the request origin.
 
 > `.env` and `.dev.vars` are gitignored. Never commit secrets.
 
@@ -103,6 +150,7 @@ Run the migrations in `migrations/` against your Neon database in order (e.g. vi
 - `001_initial_neon.sql` — initial schema (products, cart, orders, etc.)
 - `002_product_sort_order.sql` — adds manual product ordering (`sort_order`)
 - `003_idr_currency.sql` — converts stored monetary values from USD cents to whole IDR rupiah
+- `004_mayar_payment.sql` — adds Mayar payment fields to `orders` (`payment_id`, `payment_transaction_id`, `payment_link`, `paid_at`, etc.)
 
 > Monetary `*_cents` columns hold whole Indonesian rupiah (IDR), not sub-units. Migration `003` is idempotent-guarded via a `schema_migrations` marker, so it won't double-convert on re-run.
 
@@ -151,9 +199,12 @@ Secrets are not read from `.dev.vars` in production — set them explicitly:
 wrangler secret put DATABASE_URL
 wrangler secret put NEON_AUTH_JWKS_URL
 wrangler secret put ADMIN_EMAIL
+wrangler secret put MAYAR_API_KEY
+wrangler secret put MAYAR_WEBHOOK_TOKEN
+wrangler secret put PUBLIC_BASE_URL
 ```
 
-(Set `NEON_AUTH_ISSUER` / `NEON_AUTH_AUDIENCE` too if your Neon Auth setup uses them.)
+(Set `NEON_AUTH_ISSUER` / `NEON_AUTH_AUDIENCE` too if your Neon Auth setup uses them. `MAYAR_ENV` is a non-secret var in `wrangler.toml` — set it to `production` for live payments.)
 
 ### Deploy
 

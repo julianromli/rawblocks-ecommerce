@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import products from './routes/products.js';
 import cart from './routes/cart.js';
 import orders from './routes/orders.js';
+import payments from './routes/payments.js';
 import me from './routes/me.js';
 import media from './routes/media.js';
 import { AppEnv } from './types.js';
@@ -15,6 +16,7 @@ const api = new Hono<AppEnv>();
 api.route('/products', products);
 api.route('/cart', cart);
 api.route('/orders', orders);
+api.route('/payments', payments);
 api.route('/me', me);
 api.route('/media', media);
 

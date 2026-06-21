@@ -63,11 +63,33 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   const getAccessToken = useCallback(async () => {
-    const token = sessionToken(session);
-    if (token) return token;
+    // Neon Auth (Better Auth) keeps the raw JWT on the session at
+    // data.session.token, and the token is short-lived (~15 min). After an
+    // external redirect (e.g. returning from Mayar payment) any in-memory token
+    // may be stale, so always fetch a FRESH session and read the token from it
+    // rather than trusting cached React state.
+    const client = authClient as any;
 
-    const currentSession = await authClient?.getSession?.();
-    return sessionToken(currentSession);
+    // Preferred: the dedicated /token endpoint, exposed as authClient.token().
+    try {
+      const result = await client?.token?.();
+      const token = result?.data?.token || result?.token || null;
+      if (token) return token;
+    } catch {
+      // Fall through.
+    }
+
+    // Fallback: a fresh getSession() carries the JWT at data.session.token.
+    try {
+      const fresh = await client?.getSession?.();
+      const token = sessionToken(fresh);
+      if (token) return token;
+    } catch {
+      // Fall through.
+    }
+
+    // Last resort: whatever is in the cached session state.
+    return sessionToken(session);
   }, [session]);
 
   const refreshProfile = useCallback(async () => {

@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { requireUser } from '../lib/auth.js';
 import { getSql } from '../lib/db.js';
 import { badRequest, toErrorResponse } from '../lib/errors.js';
+import { createPaymentRequest } from '../lib/mayar.js';
 
 import { AppEnv } from '../types.js';
 
@@ -36,6 +37,8 @@ const readOrders = async (sql: any, userId: string) => {
     shipping: order.shipping_cents,
     total: order.total_cents,
     shippingDetails: order.shipping_details,
+    paymentLink: order.payment_link,
+    paidAt: order.paid_at,
     createdAt: order.created_at,
     items: items
       .filter((item: any) => item.order_id === order.id)
@@ -91,7 +94,7 @@ orders.post('/', async (c) => {
 
     const [order] = await sql`
       with cart_snapshot as (
-        select ci.product_id, ci.quantity, p.name, p.price_cents
+        select ci.product_id, ci.quantity, p.name, p.price_cents, p.slug
         from cart_items ci
         join products p on p.id = ci.product_id
         where ci.user_id = ${user.id}
@@ -99,7 +102,12 @@ orders.post('/', async (c) => {
         for update
       ),
       totals as (
-        select coalesce(sum(price_cents * quantity), 0)::integer as subtotal_cents
+        select
+          coalesce(sum(price_cents * quantity), 0)::integer as subtotal_cents,
+          -- Charge shipping only when the cart contains at least one
+          -- non-test product. A cart of only 'test-product' ships free so
+          -- production payment tests can pay the exact item price.
+          bool_or(slug <> 'test-product') as has_shippable
         from cart_snapshot
       ),
       created_order as (
@@ -108,8 +116,8 @@ orders.post('/', async (c) => {
           ${user.id},
           ${shippingDetails.email},
           totals.subtotal_cents,
-          case when totals.subtotal_cents > 0 then ${SHIPPING_CENTS} else 0 end,
-          totals.subtotal_cents + case when totals.subtotal_cents > 0 then ${SHIPPING_CENTS} else 0 end,
+          case when totals.subtotal_cents > 0 and totals.has_shippable then ${SHIPPING_CENTS} else 0 end,
+          totals.subtotal_cents + case when totals.subtotal_cents > 0 and totals.has_shippable then ${SHIPPING_CENTS} else 0 end,
           cast(${JSON.stringify(shippingDetails)} as jsonb)
         from totals
         where totals.subtotal_cents > 0
@@ -134,13 +142,41 @@ orders.post('/', async (c) => {
       throw badRequest('Cart is empty');
     }
 
+    // Create the hosted Mayar payment request for this order. The customer is
+    // redirected to `paymentLink`; the payment.received webhook later marks the
+    // order paid. If payment creation fails we surface the error but leave the
+    // pending order in place so the user can retry from the Orders page.
+    const baseUrl = (c.env.PUBLIC_BASE_URL || new URL(c.req.url).origin).replace(/\/$/, '');
+    const customerName =
+      [shippingDetails.firstName, shippingDetails.lastName].filter(Boolean).join(' ') ||
+      shippingDetails.email;
+
+    const payment = await createPaymentRequest(c.env, {
+      name: customerName,
+      email: shippingDetails.email,
+      amount: order.total_cents,
+      description: `RAWBLOX order #${String(order.id).slice(0, 8)}`,
+      redirectUrl: `${baseUrl}/orders?order=${order.id}`,
+    });
+
+    const [updated] = await sql`
+      update orders set
+        payment_provider = 'mayar',
+        payment_id = ${payment.id},
+        payment_transaction_id = ${payment.transactionId},
+        payment_link = ${payment.link}
+      where id = ${order.id}
+      returning *
+    `;
+
     return c.json(
       {
         order: {
-          id: order.id,
-          status: order.status,
-          total: order.total_cents,
-          createdAt: order.created_at,
+          id: updated.id,
+          status: updated.status,
+          total: updated.total_cents,
+          paymentLink: updated.payment_link,
+          createdAt: updated.created_at,
         },
       },
       201,
